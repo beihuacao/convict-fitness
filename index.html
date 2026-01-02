@@ -1,0 +1,267 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>囚徒健身记录器</title>
+    <style>
+        /* --- 1. 基础样式 (CSS) --- */
+        :root {
+            --primary: #2c3e50;
+            --accent: #e74c3c; /* 囚徒红 */
+            --bg: #f4f6f8;
+            --card-bg: #ffffff;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background-color: var(--bg);
+            margin: 0;
+            padding: 0;
+            color: #333;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        .container {
+            max-width: 600px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        h1, h2 { text-align: center; margin-bottom: 20px; }
+        
+        /* 导航卡片网格 */
+        .grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+        }
+
+        .card {
+            background: var(--card-bg);
+            padding: 20px;
+            border-radius: 12px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.05);
+            text-align: center;
+            cursor: pointer;
+            transition: transform 0.1s;
+        }
+        .card:active { transform: scale(0.98); }
+        .card h3 { margin: 0 0 5px 0; font-size: 18px; }
+        .card p { margin: 0; color: #666; font-size: 14px; }
+
+        /* 详情页样式 */
+        .detail-view { display: none; } /* 默认隐藏 */
+        .show { display: block; }
+        .hide { display: none; }
+
+        .form-group { margin-bottom: 20px; }
+        label { display: block; margin-bottom: 8px; font-weight: bold; }
+        
+        input, select {
+            width: 100%;
+            padding: 12px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            box-sizing: border-box; /* 关键：防止输入框撑破布局 */
+            font-size: 16px;
+        }
+
+        button {
+            width: 100%;
+            padding: 15px;
+            background-color: var(--primary);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: bold;
+            cursor: pointer;
+            margin-top: 10px;
+        }
+        
+        button.secondary { background-color: #95a5a6; }
+
+        /* 历史记录列表 */
+        .log-item {
+            background: white;
+            padding: 15px;
+            margin-bottom: 10px;
+            border-radius: 8px;
+            border-left: 5px solid var(--accent);
+            display: flex;
+            justify-content: space-between;
+        }
+        .log-date { color: #888; font-size: 12px; }
+
+    </style>
+</head>
+<body>
+
+<div class="container">
+    
+    <div id="dashboard">
+        <h1>🔥 囚徒健身日志</h1>
+        <div class="grid" id="menu-grid">
+            </div>
+        <div style="margin-top:30px;">
+            <h3>最近记录</h3>
+            <div id="recent-logs"></div>
+        </div>
+    </div>
+
+    <div id="workout-page" class="detail-view">
+        <h2 id="page-title">动作名称</h2>
+        
+        <div class="card" style="margin-bottom: 20px; text-align: left;">
+            <label>当前进度 (第几式):</label>
+            <select id="step-select">
+                <option value="1">1. 疗伤级</option>
+                <option value="2">2. 初级</option>
+                <option value="3">3. 中级</option>
+                <option value="4">4. 进阶级</option>
+                <option value="5">5. 基准级 (标准动作)</option>
+                <option value="6">6. 强化级</option>
+                <option value="7">7. 偏重级</option>
+                <option value="8">8. 半单侧级</option>
+                <option value="9">9. 辅助单侧级</option>
+                <option value="10">10. 终极大师级</option>
+            </select>
+        </div>
+
+        <div class="form-group">
+            <label>今日训练 (组数 x 次数，用逗号隔开):</label>
+            <input type="text" id="reps-input" placeholder="例如: 20, 20, 15">
+        </div>
+
+        <div class="form-group">
+            <label>备注 (感受):</label>
+            <input type="text" id="note-input" placeholder="动作是否标准？关节痛？">
+        </div>
+
+        <button onclick="saveLog()">💾 记录完成</button>
+        <button class="secondary" onclick="goHome()">🔙 返回首页</button>
+    </div>
+
+</div>
+
+<script>
+    // --- 2. 逻辑控制 (JavaScript) ---
+
+    // 基础配置：六艺
+    const exercises = {
+        pushup: { name: "俯卧撑", color: "#e74c3c" },
+        squat: { name: "深蹲", color: "#3498db" },
+        pullup: { name: "引体向上", color: "#f1c40f" },
+        legraise: { name: "举腿", color: "#2ecc71" },
+        bridge: { name: "桥", color: "#9b59b6" },
+        handstand: { name: "倒立撑", color: "#34495e" }
+    };
+
+    let currentExerciseKey = '';
+
+    // 初始化：加载首页
+    function init() {
+        const grid = document.getElementById('menu-grid');
+        grid.innerHTML = '';
+        
+        // 生成六艺按钮
+        for (let key in exercises) {
+            let item = exercises[key];
+            // 获取当前在这个动作上的等级（从localStorage读取，默认为1）
+            let savedStep = localStorage.getItem(`step_${key}`) || 1;
+            
+            grid.innerHTML += `
+                <div class="card" onclick="openExercise('${key}')">
+                    <h3>${item.name}</h3>
+                    <p>当前: 第 ${savedStep} 式</p>
+                </div>
+            `;
+        }
+        renderHistory();
+    }
+
+    // 打开记录页面
+    function openExercise(key) {
+        currentExerciseKey = key;
+        document.getElementById('dashboard').classList.add('hide');
+        document.getElementById('workout-page').classList.add('show');
+        
+        document.getElementById('page-title').innerText = exercises[key].name;
+        
+        // 自动填入上次的等级
+        let savedStep = localStorage.getItem(`step_${key}`) || 1;
+        document.getElementById('step-select').value = savedStep;
+        
+        // 清空输入框
+        document.getElementById('reps-input').value = '';
+        document.getElementById('note-input').value = '';
+    }
+
+    // 返回首页
+    function goHome() {
+        document.getElementById('dashboard').classList.remove('hide');
+        document.getElementById('workout-page').classList.remove('show');
+        init(); // 刷新数据
+    }
+
+    // 保存记录
+    function saveLog() {
+        const step = document.getElementById('step-select').value;
+        const reps = document.getElementById('reps-input').value;
+        const note = document.getElementById('note-input').value;
+
+        if (!reps) { alert("请填写做了多少个！"); return; }
+
+        // 1. 保存当前等级偏好
+        localStorage.setItem(`step_${currentExerciseKey}`, step);
+
+        // 2. 构建日志对象
+        const log = {
+            id: Date.now(),
+            date: new Date().toLocaleDateString(),
+            time: new Date().toLocaleTimeString(),
+            exerciseName: exercises[currentExerciseKey].name,
+            step: step,
+            reps: reps,
+            note: note
+        };
+
+        // 3. 读取旧日志 -> 添加新日志 -> 存回去
+        let logs = JSON.parse(localStorage.getItem('training_logs') || "[]");
+        logs.unshift(log); // 加到最前面
+        localStorage.setItem('training_logs', JSON.stringify(logs));
+
+        alert('✅ 记录已保存！');
+        goHome();
+    }
+
+    // 渲染历史记录
+    function renderHistory() {
+        const container = document.getElementById('recent-logs');
+        let logs = JSON.parse(localStorage.getItem('training_logs') || "[]");
+        
+        if (logs.length === 0) {
+            container.innerHTML = '<p style="text-align:center;color:#999">暂无记录，快开始锻炼吧！</p>';
+            return;
+        }
+
+        // 只显示最近 5 条
+        container.innerHTML = logs.slice(0, 5).map(log => `
+            <div class="log-item">
+                <div>
+                    <strong>${log.exerciseName}</strong> <span style="font-size:12px;color:#666">(第${log.step}式)</span><br>
+                    <span style="font-size:14px">组数: ${log.reps}</span>
+                    ${log.note ? `<br><span style="font-size:12px;color:#888">📝 ${log.note}</span>` : ''}
+                </div>
+                <div class="log-date">${log.date}</div>
+            </div>
+        `).join('');
+    }
+
+    // 启动
+    init();
+
+</script>
+</body>
+</html>
