@@ -95,14 +95,15 @@
 
 <script>
     // ----------------------------------------------------
-    // ⚠️⚠️ 请在此处填入你的 Supabase 信息 ⚠️⚠️
+    // ⚠️⚠️ 这里填入你的 Supabase 信息 ⚠️⚠️
     // ----------------------------------------------------
+    // 注意：我已经把它们放在了这里，但为了安全（见下文提醒），建议你后续去后台重新生成一个KEY
     const SUPABASE_URL = 'https://pcqnommlfizdqeyodsfw.supabase.co'; 
     const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBjcW5vbW1sZml6ZHFleW9kc2Z3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjczNjUyMTIsImV4cCI6MjA4Mjk0MTIxMn0.i_xy37yDL8-D7mnDkQmJfzjK2EQgXQCLLvDN8BImotg'; 
     // ----------------------------------------------------
 
-    // 初始化 Supabase 客户端
-    const supabase = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+    // 🔥 修复点 1：将变量名从 supabase 改为 supabaseClient，避免和库名冲突
+    const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
     // 基础配置
     const exercises = {
@@ -124,19 +125,18 @@
     };
 
     let currentExerciseKey = '';
-    let globalLogs = []; // 存储从云端获取的数据
+    let globalLogs = []; 
 
     // 页面加载时执行
     async function init() {
         renderDashboardGrid();
         
-        // 检查是否有旧数据，决定是否显示“同步旧数据”按钮
         const localLogs = JSON.parse(localStorage.getItem('training_logs') || "[]");
         if (localLogs.length === 0) {
             document.getElementById('upload-btn').style.display = 'none';
         }
 
-        await fetchLogs(); // 从云端拉取数据
+        await fetchLogs(); 
     }
 
     function renderDashboardGrid() {
@@ -144,7 +144,6 @@
         grid.innerHTML = '';
         for (let key in exercises) {
             let item = exercises[key];
-            // 进度依然优先读取本地偏好，体验更好
             let savedStep = localStorage.getItem(`step_${key}`) || 1;
             grid.innerHTML += `
                 <div class="card" onclick="openExercise('${key}')">
@@ -155,12 +154,12 @@
         }
     }
 
-    // 🔥 核心：从 Supabase 获取数据
+    // 🔥 修复点 2：改为使用 supabaseClient 来调用
     async function fetchLogs() {
         document.getElementById('recent-logs').innerHTML = '正在同步云端数据...';
         
-        // 查询 logs 表，按创建时间倒序
-        const { data, error } = await supabase
+        // 注意这里：用了 supabaseClient
+        const { data, error } = await supabaseClient
             .from('logs')
             .select('*')
             .order('created_at', { ascending: false });
@@ -171,11 +170,10 @@
             return;
         }
 
-        globalLogs = data; // 存到全局变量供统计使用
+        globalLogs = data; 
         renderHistory(globalLogs);
     }
 
-    // 打开记录页面
     function openExercise(key) {
         currentExerciseKey = key;
         showPage('workout-page');
@@ -189,7 +187,7 @@
         document.getElementById('note-input').value = '';
     }
 
-    // 🔥 核心：保存到 Supabase
+    // 🔥 修复点 3：改为使用 supabaseClient
     async function saveLog() {
         const step = document.getElementById('step-select').value;
         let rawReps = document.getElementById('reps-input').value;
@@ -198,20 +196,18 @@
         if (!rawReps) { alert("请填写做了多少个！"); return; }
         const reps = rawReps.replace(/，|\s+/g, ','); 
 
-        // 记录偏好到本地
         localStorage.setItem(`step_${currentExerciseKey}`, step);
 
         showLoading(true);
 
-        // 插入数据库
-        const { error } = await supabase
+        // 注意这里：用了 supabaseClient
+        const { error } = await supabaseClient
             .from('logs')
             .insert({
                 exercise: exercises[currentExerciseKey].name,
                 step: parseInt(step),
                 reps: reps,
-                note: note,
-                // created_at 会由数据库自动生成
+                note: note
             });
 
         showLoading(false);
@@ -224,12 +220,12 @@
         }
     }
 
-    // 🔥 核心：从 Supabase 删除
+    // 🔥 修复点 4：改为使用 supabaseClient
     async function deleteLog(id) {
         if (!confirm("确定要删除这条云端记录吗？")) return;
         
         showLoading(true);
-        const { error } = await supabase
+        const { error } = await supabaseClient
             .from('logs')
             .delete()
             .eq('id', id);
@@ -239,11 +235,11 @@
         if (error) {
             alert('删除失败: ' + error.message);
         } else {
-            fetchLogs(); // 重新拉取
+            fetchLogs(); 
         }
     }
 
-    // ⬆️ 工具：把旧的 localStorage 数据上传到云端
+    // 🔥 修复点 5：改为使用 supabaseClient
     async function uploadLocalData() {
         const localLogs = JSON.parse(localStorage.getItem('training_logs') || "[]");
         if (localLogs.length === 0) { alert("本地没有旧数据"); return; }
@@ -251,25 +247,24 @@
 
         showLoading(true);
         
-        // 转换数据格式
         const payload = localLogs.map(log => ({
-            exercise: log.exerciseName, // 旧键名 -> 新键名
+            exercise: log.exerciseName, 
             step: parseInt(log.step),
             reps: log.reps,
             note: log.note,
-            created_at: new Date(log.id).toISOString() // 用旧ID(时间戳)作为创建时间
+            created_at: new Date(log.id).toISOString() 
         }));
 
-        const { error } = await supabase.from('logs').insert(payload);
+        const { error } = await supabaseClient.from('logs').insert(payload);
         showLoading(false);
 
         if (error) {
             alert("上传失败: " + error.message);
         } else {
             alert("🎉 全部上传成功！本地旧数据已清空。");
-            localStorage.removeItem('training_logs'); // 清空本地避免重复
+            localStorage.removeItem('training_logs'); 
             document.getElementById('upload-btn').style.display = 'none';
-            fetchLogs(); // 刷新列表
+            fetchLogs(); 
         }
     }
 
@@ -281,7 +276,6 @@
         }
 
         container.innerHTML = logs.slice(0, 10).map(log => {
-            // 格式化时间
             const dateObj = new Date(log.created_at);
             const dateStr = dateObj.toLocaleDateString();
             
@@ -300,7 +294,6 @@
         }).join('');
     }
 
-    // 统计页逻辑
     function openStatsPage() {
         showPage('stats-page');
         const statsGrid = document.getElementById('stats-grid');
@@ -311,7 +304,6 @@
             totals[exercises[key].name] = { reps: 0, sets: 0, color: exercises[key].color };
         }
 
-        // 使用全局拉取的 globalLogs 进行统计
         globalLogs.forEach(log => {
             if (totals[log.exercise]) {
                 let parts = log.reps.split(',');
@@ -352,7 +344,7 @@
 
     function goHome() {
         showPage('dashboard');
-        fetchLogs(); // 每次回首页刷新数据
+        fetchLogs(); 
     }
 
     function showLoading(isLoading) {
