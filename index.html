@@ -3,164 +3,61 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>囚徒健身记录器</title>
+    <title>囚徒健身 (云端版)</title>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
-        /* --- 1. 基础样式 (CSS) --- */
-        :root {
-            --primary: #2c3e50;
-            --accent: #e74c3c;
-            --bg: #f4f6f8;
-            --card-bg: #ffffff;
-            --info-bg: #e8f6f3;
-            --info-text: #1abc9c;
-            --danger: #e74c3c;
-        }
-
-        body {
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-            background-color: var(--bg);
-            margin: 0;
-            padding: 0;
-            color: #333;
-            -webkit-tap-highlight-color: transparent;
-        }
-
-        .container {
-            max-width: 600px;
-            margin: 0 auto;
-            padding: 20px;
-            padding-bottom: 80px;
-        }
-
+        /* --- 样式保持不变 --- */
+        :root { --primary: #2c3e50; --accent: #e74c3c; --bg: #f4f6f8; --card-bg: #ffffff; --info-bg: #e8f6f3; --info-text: #1abc9c; --danger: #e74c3c; }
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background-color: var(--bg); margin: 0; padding: 0; color: #333; -webkit-tap-highlight-color: transparent; }
+        .container { max-width: 600px; margin: 0 auto; padding: 20px; padding-bottom: 80px; }
         h1, h2 { text-align: center; margin-bottom: 20px; }
-        
-        /* 导航卡片 */
-        .grid {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 15px;
-        }
-
-        .card {
-            background: var(--card-bg);
-            padding: 20px;
-            border-radius: 12px;
-            box-shadow: 0 4px 6px rgba(0,0,0,0.05);
-            text-align: center;
-            cursor: pointer;
-            transition: transform 0.1s;
-        }
+        .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; }
+        .card { background: var(--card-bg); padding: 20px; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); text-align: center; cursor: pointer; transition: transform 0.1s; }
         .card:active { transform: scale(0.98); }
         .card h3 { margin: 0 0 5px 0; font-size: 18px; }
         .card p { margin: 0; color: #666; font-size: 14px; }
-
-        /* 统计卡片特别样式 */
-        .stat-card {
-            background: white;
-            padding: 15px;
-            border-radius: 10px;
-            text-align: center;
-            border-top: 4px solid #ccc; /* 默认颜色，JS会覆盖 */
-            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
-        }
-        .stat-number {
-            font-size: 24px;
-            font-weight: bold;
-            color: var(--primary);
-            display: block;
-            margin: 5px 0;
-        }
+        .stat-card { background: white; padding: 15px; border-radius: 10px; text-align: center; border-top: 4px solid #ccc; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
+        .stat-number { font-size: 24px; font-weight: bold; color: var(--primary); display: block; margin: 5px 0; }
         .stat-label { font-size: 12px; color: #888; }
-
-        /* 页面切换控制 */
-        .detail-view { display: none; }
-        .show { display: block; }
-        .hide { display: none; }
-
+        .detail-view { display: none; } .show { display: block; } .hide { display: none; }
         .form-group { margin-bottom: 20px; }
         label { display: block; margin-bottom: 8px; font-weight: bold; }
-        
-        .goal-box {
-            background-color: var(--info-bg);
-            color: var(--primary);
-            padding: 15px;
-            border-radius: 8px;
-            border-left: 5px solid var(--info-text);
-            margin-bottom: 20px;
-            font-size: 14px;
-            line-height: 1.5;
-        }
+        .goal-box { background-color: var(--info-bg); color: var(--primary); padding: 15px; border-radius: 8px; border-left: 5px solid var(--info-text); margin-bottom: 20px; font-size: 14px; line-height: 1.5; }
         .goal-title { font-weight: bold; color: var(--info-text); display: block; margin-bottom: 4px; }
-
-        input, select {
-            width: 100%;
-            padding: 12px;
-            border: 1px solid #ddd;
-            border-radius: 8px;
-            box-sizing: border-box;
-            font-size: 16px;
-            background: #fff;
-        }
-
-        button {
-            width: 100%;
-            padding: 15px;
-            background-color: var(--primary);
-            color: white;
-            border: none;
-            border-radius: 8px;
-            font-size: 16px;
-            font-weight: bold;
-            cursor: pointer;
-            margin-top: 10px;
-        }
-        
+        input, select { width: 100%; padding: 12px; border: 1px solid #ddd; border-radius: 8px; box-sizing: border-box; font-size: 16px; background: #fff; }
+        button { width: 100%; padding: 15px; background-color: var(--primary); color: white; border: none; border-radius: 8px; font-size: 16px; font-weight: bold; cursor: pointer; margin-top: 10px; }
         button.secondary { background-color: #95a5a6; }
         button.outline { background-color: transparent; border: 2px solid var(--primary); color: var(--primary); }
-
-        /* 历史记录列表 */
-        .log-item {
-            background: white;
-            padding: 15px;
-            margin-bottom: 10px;
-            border-radius: 8px;
-            border-left: 5px solid var(--accent);
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }
+        button:disabled { opacity: 0.6; cursor: not-allowed; }
+        .log-item { background: white; padding: 15px; margin-bottom: 10px; border-radius: 8px; border-left: 5px solid var(--accent); display: flex; justify-content: space-between; align-items: center; }
         .log-content { flex: 1; padding-right: 10px; }
         .log-actions { text-align: right; min-width: 70px; }
         .log-date { color: #888; font-size: 12px; display: block; margin-bottom: 5px; }
-
-        .delete-btn {
-            background-color: white;
-            color: var(--danger);
-            border: 1px solid var(--danger);
-            padding: 5px 10px;
-            font-size: 12px;
-            border-radius: 4px;
-            width: auto;
-            cursor: pointer;
-        }
-
+        .delete-btn { background-color: white; color: var(--danger); border: 1px solid var(--danger); padding: 5px 10px; font-size: 12px; border-radius: 4px; width: auto; cursor: pointer; }
+        /* 加载动画 */
+        .loading-overlay { position: fixed; top:0; left:0; right:0; bottom:0; background: rgba(255,255,255,0.8); display: flex; justify-content: center; align-items: center; z-index: 999; display: none; }
+        .spinner { width: 40px; height: 40px; border: 4px solid #f3f3f3; border-top: 4px solid var(--primary); border-radius: 50%; animation: spin 1s linear infinite; }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
     </style>
 </head>
 <body>
 
+<div id="loading" class="loading-overlay"><div class="spinner"></div></div>
+
 <div class="container">
     
     <div id="dashboard">
-        <h1>🔥 囚徒健身日志</h1>
+        <h1>☁️ 囚徒健身 (云端版)</h1>
         <div class="grid" id="menu-grid"></div>
 
-        <div style="margin-top:20px;">
+        <div style="margin-top:20px; display: flex; gap: 10px;">
             <button class="outline" onclick="openStatsPage()">📊 查看生涯统计</button>
+            <button class="secondary" style="background:#f39c12" onclick="uploadLocalData()" id="upload-btn">⬆️ 同步旧数据</button>
         </div>
 
         <div style="margin-top:30px;">
-            <h3>最近记录</h3>
-            <div id="recent-logs"></div>
+            <h3>最近云端记录</h3>
+            <div id="recent-logs">加载中...</div>
         </div>
     </div>
 
@@ -184,25 +81,30 @@
             <label>备注 (感受):</label>
             <input type="text" id="note-input" placeholder="动作是否标准？关节痛？">
         </div>
-        <button onclick="saveLog()">💾 记录完成</button>
+        <button onclick="saveLog()">💾 保存到云端</button>
         <button class="secondary" onclick="goHome()">🔙 返回首页</button>
     </div>
 
     <div id="stats-page" class="detail-view">
-        <h2>📊 生涯总统计</h2>
-        <p style="text-align:center; color:#666; font-size:14px; margin-bottom:20px;">既然选择了这行，就别想半途而废。</p>
-        
-        <div class="grid" id="stats-grid">
-            </div>
-
+        <h2>📊 云端生涯统计</h2>
+        <div class="grid" id="stats-grid"></div>
         <button class="secondary" onclick="goHome()">🔙 返回首页</button>
     </div>
 
 </div>
 
 <script>
-    // --- 2. 逻辑控制 (JavaScript) ---
+    // ----------------------------------------------------
+    // ⚠️⚠️ 请在此处填入你的 Supabase 信息 ⚠️⚠️
+    // ----------------------------------------------------
+    const SUPABASE_URL = 'https://pcqnommlfizdqeyodsfw.supabase.co'; 
+    const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBjcW5vbW1sZml6ZHFleW9kc2Z3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjczNjUyMTIsImV4cCI6MjA4Mjk0MTIxMn0.i_xy37yDL8-D7mnDkQmJfzjK2EQgXQCLLvDN8BImotg'; 
+    // ----------------------------------------------------
 
+    // 初始化 Supabase 客户端
+    const supabase = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+    // 基础配置
     const exercises = {
         pushup: { name: "俯卧撑", color: "#e74c3c" },
         squat: { name: "深蹲", color: "#3498db" },
@@ -222,13 +124,27 @@
     };
 
     let currentExerciseKey = '';
+    let globalLogs = []; // 存储从云端获取的数据
 
-    function init() {
+    // 页面加载时执行
+    async function init() {
+        renderDashboardGrid();
+        
+        // 检查是否有旧数据，决定是否显示“同步旧数据”按钮
+        const localLogs = JSON.parse(localStorage.getItem('training_logs') || "[]");
+        if (localLogs.length === 0) {
+            document.getElementById('upload-btn').style.display = 'none';
+        }
+
+        await fetchLogs(); // 从云端拉取数据
+    }
+
+    function renderDashboardGrid() {
         const grid = document.getElementById('menu-grid');
         grid.innerHTML = '';
-        
         for (let key in exercises) {
             let item = exercises[key];
+            // 进度依然优先读取本地偏好，体验更好
             let savedStep = localStorage.getItem(`step_${key}`) || 1;
             grid.innerHTML += `
                 <div class="card" onclick="openExercise('${key}')">
@@ -237,9 +153,29 @@
                 </div>
             `;
         }
-        renderHistory();
     }
 
+    // 🔥 核心：从 Supabase 获取数据
+    async function fetchLogs() {
+        document.getElementById('recent-logs').innerHTML = '正在同步云端数据...';
+        
+        // 查询 logs 表，按创建时间倒序
+        const { data, error } = await supabase
+            .from('logs')
+            .select('*')
+            .order('created_at', { ascending: false });
+
+        if (error) {
+            console.error(error);
+            document.getElementById('recent-logs').innerHTML = '<span style="color:red">数据加载失败，请检查配置</span>';
+            return;
+        }
+
+        globalLogs = data; // 存到全局变量供统计使用
+        renderHistory(globalLogs);
+    }
+
+    // 打开记录页面
     function openExercise(key) {
         currentExerciseKey = key;
         showPage('workout-page');
@@ -253,36 +189,137 @@
         document.getElementById('note-input').value = '';
     }
 
-    // 📊 新增：计算并展示统计数据
+    // 🔥 核心：保存到 Supabase
+    async function saveLog() {
+        const step = document.getElementById('step-select').value;
+        let rawReps = document.getElementById('reps-input').value;
+        const note = document.getElementById('note-input').value;
+
+        if (!rawReps) { alert("请填写做了多少个！"); return; }
+        const reps = rawReps.replace(/，|\s+/g, ','); 
+
+        // 记录偏好到本地
+        localStorage.setItem(`step_${currentExerciseKey}`, step);
+
+        showLoading(true);
+
+        // 插入数据库
+        const { error } = await supabase
+            .from('logs')
+            .insert({
+                exercise: exercises[currentExerciseKey].name,
+                step: parseInt(step),
+                reps: reps,
+                note: note,
+                // created_at 会由数据库自动生成
+            });
+
+        showLoading(false);
+
+        if (error) {
+            alert('❌ 保存失败: ' + error.message);
+        } else {
+            alert('✅ 已保存到云端！');
+            goHome();
+        }
+    }
+
+    // 🔥 核心：从 Supabase 删除
+    async function deleteLog(id) {
+        if (!confirm("确定要删除这条云端记录吗？")) return;
+        
+        showLoading(true);
+        const { error } = await supabase
+            .from('logs')
+            .delete()
+            .eq('id', id);
+        
+        showLoading(false);
+
+        if (error) {
+            alert('删除失败: ' + error.message);
+        } else {
+            fetchLogs(); // 重新拉取
+        }
+    }
+
+    // ⬆️ 工具：把旧的 localStorage 数据上传到云端
+    async function uploadLocalData() {
+        const localLogs = JSON.parse(localStorage.getItem('training_logs') || "[]");
+        if (localLogs.length === 0) { alert("本地没有旧数据"); return; }
+        if (!confirm(`发现 ${localLogs.length} 条本地旧记录，要上传到云端吗？`)) return;
+
+        showLoading(true);
+        
+        // 转换数据格式
+        const payload = localLogs.map(log => ({
+            exercise: log.exerciseName, // 旧键名 -> 新键名
+            step: parseInt(log.step),
+            reps: log.reps,
+            note: log.note,
+            created_at: new Date(log.id).toISOString() // 用旧ID(时间戳)作为创建时间
+        }));
+
+        const { error } = await supabase.from('logs').insert(payload);
+        showLoading(false);
+
+        if (error) {
+            alert("上传失败: " + error.message);
+        } else {
+            alert("🎉 全部上传成功！本地旧数据已清空。");
+            localStorage.removeItem('training_logs'); // 清空本地避免重复
+            document.getElementById('upload-btn').style.display = 'none';
+            fetchLogs(); // 刷新列表
+        }
+    }
+
+    function renderHistory(logs) {
+        const container = document.getElementById('recent-logs');
+        if (logs.length === 0) {
+            container.innerHTML = '<p style="text-align:center;color:#999">云端暂无数据</p>';
+            return;
+        }
+
+        container.innerHTML = logs.slice(0, 10).map(log => {
+            // 格式化时间
+            const dateObj = new Date(log.created_at);
+            const dateStr = dateObj.toLocaleDateString();
+            
+            return `
+            <div class="log-item">
+                <div class="log-content">
+                    <strong>${log.exercise}</strong> <span style="font-size:12px;color:#666">(第${log.step}式)</span><br>
+                    <span style="font-size:14px">组数: ${log.reps}</span>
+                    ${log.note ? `<br><span style="font-size:12px;color:#888">📝 ${log.note}</span>` : ''}
+                </div>
+                <div class="log-actions">
+                    <span class="log-date">${dateStr}</span>
+                    <button class="delete-btn" onclick="deleteLog(${log.id})">删除</button>
+                </div>
+            </div>`;
+        }).join('');
+    }
+
+    // 统计页逻辑
     function openStatsPage() {
         showPage('stats-page');
         const statsGrid = document.getElementById('stats-grid');
-        statsGrid.innerHTML = ''; // 清空旧数据
+        statsGrid.innerHTML = ''; 
 
-        // 1. 准备统计容器
         let totals = {};
         for (let key in exercises) {
             totals[exercises[key].name] = { reps: 0, sets: 0, color: exercises[key].color };
         }
 
-        // 2. 遍历所有历史记录
-        let logs = JSON.parse(localStorage.getItem('training_logs') || "[]");
-        
-        logs.forEach(log => {
-            // 如果这个动作在我们的列表里
-            if (totals[log.exerciseName]) {
-                // 拆分 "20, 20, 15"
+        // 使用全局拉取的 globalLogs 进行统计
+        globalLogs.forEach(log => {
+            if (totals[log.exercise]) {
                 let parts = log.reps.split(',');
-                // 累加组数
-                totals[log.exerciseName].sets += parts.length;
-                // 累加次数
-                parts.forEach(num => {
-                    totals[log.exerciseName].reps += (parseInt(num) || 0);
-                });
+                totals[log.exercise].sets += parts.length;
+                parts.forEach(num => totals[log.exercise].reps += (parseInt(num) || 0));
             }
         });
 
-        // 3. 渲染到界面
         for (let name in totals) {
             let data = totals[name];
             statsGrid.innerHTML += `
@@ -301,19 +338,13 @@
         document.getElementById('goal-text').innerText = standardText || "未知标准";
     }
 
-    // 通用页面切换函数
     function showPage(pageId) {
-        // 隐藏所有页面
         document.getElementById('dashboard').classList.add('hide');
-        document.getElementById('workout-page').classList.remove('show'); // remove show class
         document.getElementById('workout-page').classList.add('hide');
-        document.getElementById('stats-page').classList.remove('show');
         document.getElementById('stats-page').classList.add('hide');
-
-        // 显示目标页面
-        if(pageId === 'dashboard') {
-            document.getElementById('dashboard').classList.remove('hide');
-        } else {
+        
+        if(pageId === 'dashboard') document.getElementById('dashboard').classList.remove('hide');
+        else {
             document.getElementById(pageId).classList.remove('hide');
             document.getElementById(pageId).classList.add('show');
         }
@@ -321,69 +352,11 @@
 
     function goHome() {
         showPage('dashboard');
-        init();
+        fetchLogs(); // 每次回首页刷新数据
     }
 
-    function saveLog() {
-        const step = document.getElementById('step-select').value;
-        let rawReps = document.getElementById('reps-input').value;
-        const note = document.getElementById('note-input').value;
-
-        if (!rawReps) { alert("请填写做了多少个！"); return; }
-
-        const reps = rawReps.replace(/，|\s+/g, ','); 
-
-        localStorage.setItem(`step_${currentExerciseKey}`, step);
-
-        const log = {
-            id: Date.now(),
-            date: new Date().toLocaleDateString(),
-            time: new Date().toLocaleTimeString(),
-            exerciseName: exercises[currentExerciseKey].name,
-            step: step,
-            reps: reps,
-            note: note
-        };
-
-        let logs = JSON.parse(localStorage.getItem('training_logs') || "[]");
-        logs.unshift(log);
-        localStorage.setItem('training_logs', JSON.stringify(logs));
-
-        alert('✅ 记录已保存！');
-        goHome();
-    }
-
-    function deleteLog(id) {
-        if (!confirm("确定要删除这条记录吗？删除后无法恢复。")) { return; }
-        let logs = JSON.parse(localStorage.getItem('training_logs') || "[]");
-        logs = logs.filter(log => log.id !== id);
-        localStorage.setItem('training_logs', JSON.stringify(logs));
-        renderHistory();
-        // 如果正在统计页删除(虽然目前统计页没删除按钮)，也应该更新逻辑，但这里主要更新首页列表
-    }
-
-    function renderHistory() {
-        const container = document.getElementById('recent-logs');
-        let logs = JSON.parse(localStorage.getItem('training_logs') || "[]");
-        
-        if (logs.length === 0) {
-            container.innerHTML = '<p style="text-align:center;color:#999">暂无记录，快开始锻炼吧！</p>';
-            return;
-        }
-
-        container.innerHTML = logs.slice(0, 10).map(log => `
-            <div class="log-item">
-                <div class="log-content">
-                    <strong>${log.exerciseName}</strong> <span style="font-size:12px;color:#666">(第${log.step}式)</span><br>
-                    <span style="font-size:14px">组数: ${log.reps}</span>
-                    ${log.note ? `<br><span style="font-size:12px;color:#888">📝 ${log.note}</span>` : ''}
-                </div>
-                <div class="log-actions">
-                    <span class="log-date">${log.date}</span>
-                    <button class="delete-btn" onclick="deleteLog(${log.id})">删除</button>
-                </div>
-            </div>
-        `).join('');
+    function showLoading(isLoading) {
+        document.getElementById('loading').style.display = isLoading ? 'flex' : 'none';
     }
 
     init();
