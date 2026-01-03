@@ -1,0 +1,434 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>囚徒健身 (云端版)</title>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    
+    <style>
+        /* --- 样式保持不变 --- */
+        :root { --primary: #2c3e50; --accent: #e74c3c; --bg: #f4f6f8; --card-bg: #ffffff; --info-bg: #e8f6f3; --info-text: #1abc9c; --danger: #e74c3c; --purple: #9b59b6; --gray: #bdc3c7; }
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background-color: var(--bg); margin: 0; padding: 0; color: #333; -webkit-tap-highlight-color: transparent; }
+        .container { max-width: 600px; margin: 0 auto; padding: 20px; padding-bottom: 80px; }
+        h1, h2 { text-align: center; margin-bottom: 20px; }
+        .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; }
+        .card { background: var(--card-bg); padding: 20px; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); text-align: center; cursor: pointer; transition: transform 0.1s; }
+        .card:active { transform: scale(0.98); }
+        .card h3 { margin: 0 0 5px 0; font-size: 18px; }
+        .card p { margin: 0; color: #666; font-size: 14px; }
+        .stat-card { background: white; padding: 15px; border-radius: 10px; text-align: center; border-top: 4px solid #ccc; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
+        .stat-number { font-size: 24px; font-weight: bold; color: var(--primary); display: block; margin: 5px 0; }
+        .stat-label { font-size: 12px; color: #888; }
+        .detail-view { display: none; } .show { display: block; } .hide { display: none; }
+        .form-group { margin-bottom: 20px; }
+        label { display: block; margin-bottom: 8px; font-weight: bold; }
+        .goal-box { background-color: var(--info-bg); color: var(--primary); padding: 15px; border-radius: 8px; border-left: 5px solid var(--info-text); margin-bottom: 20px; font-size: 14px; line-height: 1.5; }
+        .goal-title { font-weight: bold; color: var(--info-text); display: block; margin-bottom: 4px; }
+        input, select { width: 100%; padding: 12px; border: 1px solid #ddd; border-radius: 8px; box-sizing: border-box; font-size: 16px; background: #fff; }
+        button { width: 100%; padding: 15px; background-color: var(--primary); color: white; border: none; border-radius: 8px; font-size: 16px; font-weight: bold; cursor: pointer; margin-top: 10px; }
+        button.secondary { background-color: #95a5a6; }
+        button.outline { background-color: transparent; border: 2px solid var(--primary); color: var(--primary); }
+        button.purple { background-color: transparent; border: 2px solid var(--purple); color: var(--purple); }
+        button:disabled { opacity: 0.6; cursor: not-allowed; }
+        .log-item { background: white; padding: 15px; margin-bottom: 10px; border-radius: 8px; border-left: 5px solid var(--accent); display: flex; justify-content: space-between; align-items: center; }
+        .log-content { flex: 1; padding-right: 10px; }
+        .log-actions { text-align: right; min-width: 70px; }
+        .log-date { color: #888; font-size: 12px; display: block; margin-bottom: 5px; }
+        .delete-btn { background-color: white; color: var(--danger); border: 1px solid var(--danger); padding: 5px 10px; font-size: 12px; border-radius: 4px; width: auto; cursor: pointer; }
+        .loading-overlay { position: fixed; top:0; left:0; right:0; bottom:0; background: rgba(255,255,255,0.8); display: flex; justify-content: center; align-items: center; z-index: 999; display: none; }
+        .spinner { width: 40px; height: 40px; border: 4px solid #f3f3f3; border-top: 4px solid var(--primary); border-radius: 50%; animation: spin 1s linear infinite; }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        .chart-container { position: relative; height: 350px; width: 100%; margin-top: 20px; }
+        .chart-legend { display: flex; justify-content: center; gap: 20px; margin-top: 10px; font-size: 12px; color: #666; }
+        .dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; margin-right: 5px; }
+    </style>
+</head>
+<body>
+
+<div id="loading" class="loading-overlay"><div class="spinner"></div></div>
+
+<div class="container">
+    
+    <div id="dashboard">
+        <h1>☁️ 囚徒健身 (云端版)</h1>
+        <div class="grid" id="menu-grid"></div>
+
+        <div style="margin-top:20px; display: flex; flex-direction: column; gap: 10px;">
+            <div style="display: flex; gap: 10px;">
+                <button class="outline" style="flex:1" onclick="openStatsPage()">📊 生涯统计</button>
+                <button class="purple" style="flex:1" onclick="openRadarPage()">🌟 能力六芒星</button>
+            </div>
+            <button class="secondary" style="background:#f39c12; width:100%" onclick="uploadLocalData()" id="upload-btn">⬆️ 同步旧数据</button>
+        </div>
+
+        <div style="margin-top:30px;">
+            <h3>最近云端记录</h3>
+            <div id="recent-logs">加载中...</div>
+        </div>
+    </div>
+
+    <div id="workout-page" class="detail-view">
+        <h2 id="page-title">动作名称</h2>
+        <div class="form-group">
+            <label>当前进度 (第几式):</label>
+            <select id="step-select" onchange="updateGoalDisplay()">
+            </select>
+        </div>
+        <div id="goal-box" class="goal-box">
+            <span class="goal-title">🏆 升级标准</span>
+            <span id="goal-text">加载中...</span>
+        </div>
+        <div class="form-group">
+            <label>今日训练 (组数 x 次数):</label>
+            <input type="text" id="reps-input" placeholder="例如: 20 20 15">
+        </div>
+        <div class="form-group">
+            <label>备注 (感受):</label>
+            <input type="text" id="note-input" placeholder="动作是否标准？关节痛？">
+        </div>
+        <button onclick="saveLog()">💾 保存到云端</button>
+        <button class="secondary" onclick="goHome()">🔙 返回首页</button>
+    </div>
+
+    <div id="stats-page" class="detail-view">
+        <h2>📊 云端生涯统计</h2>
+        <div class="grid" id="stats-grid"></div>
+        <button class="secondary" onclick="goHome()">🔙 返回首页</button>
+    </div>
+
+    <div id="radar-page" class="detail-view">
+        <h2>🌟 你的能力六芒星</h2>
+        <p style="text-align:center;color:#666;font-size:14px;">图形基于历史最高等级 · 颜色代表活跃度</p>
+        
+        <div class="chart-container">
+            <canvas id="skillChart"></canvas>
+        </div>
+
+        <div class="chart-legend">
+            <div><span class="dot" style="background:#9b59b6"></span>活跃 (14天内练过)</div>
+            <div><span class="dot" style="background:#bdc3c7"></span>生锈 (超过14天)</div>
+        </div>
+
+        <button class="secondary" style="margin-top: 20px" onclick="goHome()">🔙 返回首页</button>
+    </div>
+
+</div>
+
+<script>
+    // ----------------------------------------------------
+    const SUPABASE_URL = 'https://pcqnommlfizdqeyodsfw.supabase.co'; 
+    const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBjcW5vbW1sZml6ZHFleW9kc2Z3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjczNjUyMTIsImV4cCI6MjA4Mjk0MTIxMn0.i_xy37yDL8-D7mnDkQmJfzjK2EQgXQCLLvDN8BImotg'; 
+    // ----------------------------------------------------
+
+    const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+    const exercises = {
+        pushup: { name: "俯卧撑", color: "#e74c3c" },
+        squat: { name: "深蹲", color: "#3498db" },
+        pullup: { name: "引体向上", color: "#f1c40f" },
+        legraise: { name: "举腿", color: "#2ecc71" },
+        bridge: { name: "桥", color: "#9b59b6" },
+        handstand: { name: "倒立撑", color: "#34495e" }
+    };
+
+    const stepNames = {
+        pushup: ["墙壁俯卧撑", "上斜俯卧撑", "膝盖俯卧撑", "半程俯卧撑", "标准俯卧撑", "窄距俯卧撑", "偏重俯卧撑", "单臂半程俯卧撑", "杠杆俯卧撑", "单臂俯卧撑"],
+        squat: ["肩倒立深蹲", "折刀深蹲", "支撑深蹲", "半程深蹲", "标准深蹲", "窄距深蹲", "偏重深蹲", "单腿半程深蹲", "辅助单腿深蹲", "单腿深蹲"],
+        pullup: ["垂直引体", "水平引体", "折刀引体", "半程引体向上", "标准引体向上", "窄距引体向上", "偏重引体向上", "单臂半程引体", "辅助单臂引体", "单臂引体向上"],
+        legraise: ["坐姿屈膝", "平卧抬膝", "平卧屈举腿", "平卧蛙举腿", "平卧直举腿", "悬垂抬膝", "悬垂屈举腿", "悬垂蛙举腿", "悬垂半程直举腿", "悬垂直举腿"],
+        bridge: ["短桥", "直桥", "高低桥", "顶桥", "半桥", "标准桥", "下行桥", "上行桥", "合桥", "铁板桥 (站立下腰)"],
+        handstand: ["靠墙顶立", "乌鸦式", "靠墙倒立", "半程倒立撑", "标准倒立撑", "窄距倒立撑", "偏重倒立撑", "单臂半程倒立撑", "杠杆倒立撑", "单臂倒立撑"]
+    };
+
+    const standards = {
+        pushup: { 1: "3组，每组50次", 2: "3组，每组40次", 3: "3组，每组30次", 4: "2组，每组25次", 5: "2组，每组20次", 6: "2组，每组20次", 7: "2组，每组20次", 8: "2组，每组20次", 9: "2组，每组20次", 10: "1组，100次 (单臂)" },
+        squat: { 1: "3组，每组50次", 2: "3组，每组40次", 3: "3组，每组30次", 4: "2组，每组50次", 5: "2组，每组30次", 6: "2组，每组20次", 7: "2组，每组20次", 8: "2组，每组20次", 9: "2组，每组20次", 10: "2组，每组50次 (单腿)" },
+        pullup: { 1: "3组，每组40次", 2: "3组，每组30次", 3: "3组，每组20次", 4: "2组，每组15次", 5: "2组，每组10次", 6: "2组，每组15次", 7: "2组，每组9次", 8: "2组，每组8次", 9: "2组，每组7次", 10: "2组，每组6次 (单臂)" },
+        legraise: { 1: "3组，每组40次", 2: "3组，每组40次", 3: "3组，每组40次", 4: "3组，每组25次", 5: "2组，每组20次", 6: "2组，每组15次", 7: "2组，每组15次", 8: "2组，每组15次", 9: "2组，每组15次", 10: "2组，每组30次 (悬垂直腿)" },
+        bridge: { 1: "3组，每组50次", 2: "3组，每组40次", 3: "3组，每组30次", 4: "2组，每组25次", 5: "2组，每组20次", 6: "2组，每组15次", 7: "2组，每组10次", 8: "2组，每组8次", 9: "2组，每组6次", 10: "2组，每组50次 (铁板桥)" },
+        handstand: { 1: "2分钟 (倒立)", 2: "1分钟 (乌鸦式)", 3: "2分钟 (靠墙倒立)", 4: "2组，每组20次 (半程)", 5: "2组，每组15次", 6: "2组，每组10次", 7: "2组，每组8次", 8: "2组，每组6次", 9: "2组，每组4次", 10: "1组，5次 (单臂)" }
+    };
+
+    let currentExerciseKey = '';
+    let globalLogs = []; 
+    // 🧠 核心：存储历史最高等级
+    let maxProgress = { pushup: 1, squat: 1, pullup: 1, legraise: 1, bridge: 1, handstand: 1 };
+    let myRadarChart = null;
+
+    async function init() {
+        const localLogs = JSON.parse(localStorage.getItem('training_logs') || "[]");
+        if (localLogs.length === 0) { document.getElementById('upload-btn').style.display = 'none'; }
+        await fetchLogs(); 
+        renderDashboardGrid(); 
+    }
+
+    function renderDashboardGrid() {
+        const grid = document.getElementById('menu-grid');
+        grid.innerHTML = '';
+        for (let key in exercises) {
+            let item = exercises[key];
+            // 💡 首页网格显示：历史最高等级
+            let maxStep = maxProgress[key]; 
+            let currentName = stepNames[key][maxStep - 1];
+            
+            grid.innerHTML += `
+                <div class="card" onclick="openExercise('${key}')">
+                    <h3>${item.name}</h3>
+                    <p>${maxStep}. ${currentName}</p>
+                </div>
+            `;
+        }
+    }
+
+    async function fetchLogs() {
+        document.getElementById('recent-logs').innerHTML = '正在同步云端数据...';
+        const { data, error } = await supabaseClient.from('logs').select('*').order('created_at', { ascending: false });
+        if (error) { console.error(error); document.getElementById('recent-logs').innerHTML = '<span style="color:red">数据加载失败</span>'; return; }
+        
+        globalLogs = data; 
+        
+        // 🧠 核心逻辑：遍历日志，计算每个动作的【历史最高等级】
+        maxProgress = { pushup: 1, squat: 1, pullup: 1, legraise: 1, bridge: 1, handstand: 1 };
+        
+        globalLogs.forEach(log => {
+            let key = Object.keys(exercises).find(k => exercises[k].name === log.exercise);
+            if (key) {
+                if (log.step > maxProgress[key]) {
+                    maxProgress[key] = log.step;
+                }
+            }
+        });
+
+        renderHistory(globalLogs);
+    }
+
+    function openExercise(key) {
+        currentExerciseKey = key;
+        showPage('workout-page');
+        document.getElementById('page-title').innerText = exercises[key].name;
+        const selectEl = document.getElementById('step-select');
+        selectEl.innerHTML = ''; 
+        stepNames[key].forEach((name, index) => {
+            let stepNum = index + 1;
+            let option = document.createElement('option');
+            option.value = stepNum;
+            option.text = `${stepNum}. ${name}`;
+            selectEl.appendChild(option);
+        });
+        
+        // 💡 保持：下拉菜单依然默认选中“上次记录的等级” (方便连续记录)
+        let savedStep = localStorage.getItem(`step_${key}`) || 1;
+        selectEl.value = savedStep;
+        
+        updateGoalDisplay();
+        document.getElementById('reps-input').value = '';
+        document.getElementById('note-input').value = '';
+    }
+
+    function openRadarPage() {
+        showPage('radar-page');
+        
+        const dataValues = [];
+        const labels = [];
+        const pointColors = []; 
+        const order = ['pushup', 'squat', 'pullup', 'legraise', 'bridge', 'handstand'];
+        const decayDays = 14; 
+
+        order.forEach(key => {
+            // 🧠 核心逻辑1：六芒星的大小取决于【Max Progress】(历史最高)
+            let step = maxProgress[key]; 
+            dataValues.push(step);
+            labels.push(exercises[key].name);
+
+            // 🧠 核心逻辑2：六芒星的颜色取决于【最近一次记录】
+            const lastLog = globalLogs.find(log => log.exercise === exercises[key].name);
+            let isDecayed = true; 
+
+            if (lastLog) {
+                const lastDate = new Date(lastLog.created_at);
+                const now = new Date();
+                const diffTime = Math.abs(now - lastDate);
+                const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)); 
+                if (diffDays <= decayDays) { isDecayed = false; }
+            }
+            pointColors.push(isDecayed ? '#bdc3c7' : '#9b59b6');
+        });
+
+        if (myRadarChart) { myRadarChart.destroy(); }
+
+        const ctx = document.getElementById('skillChart').getContext('2d');
+        myRadarChart = new Chart(ctx, {
+            type: 'radar',
+            data: {
+                labels: labels,
+                datasets: [{
+                    label: '历史最高能力',
+                    data: dataValues,
+                    backgroundColor: 'rgba(155, 89, 182, 0.2)',
+                    borderColor: 'rgba(155, 89, 182, 1)',
+                    borderWidth: 2,
+                    pointBackgroundColor: pointColors, 
+                    pointBorderColor: pointColors,
+                    pointRadius: 5, 
+                    pointHoverRadius: 7
+                }]
+            },
+            options: {
+                scales: {
+                    r: {
+                        angleLines: { color: '#eee' },
+                        grid: { color: '#eee' },
+                        suggestedMin: 0,
+                        suggestedMax: 10,
+                        ticks: { display: false, stepSize: 2 },
+                        pointLabels: { font: { size: 12, weight: 'bold' } }
+                    }
+                },
+                plugins: { legend: { display: false } }
+            }
+        });
+    }
+
+    async function saveLog() {
+        const step = document.getElementById('step-select').value;
+        let rawReps = document.getElementById('reps-input').value;
+        const note = document.getElementById('note-input').value;
+
+        if (!rawReps) { alert("请填写做了多少个！"); return; }
+        const reps = rawReps.replace(/，|\s+/g, ','); 
+
+        localStorage.setItem(`step_${currentExerciseKey}`, step);
+
+        showLoading(true);
+        const { error } = await supabaseClient.from('logs').insert({
+                exercise: exercises[currentExerciseKey].name,
+                step: parseInt(step),
+                reps: reps,
+                note: note
+            });
+        
+        if (error) { 
+            showLoading(false);
+            alert('❌ 保存失败: ' + error.message); 
+        } else { 
+            await fetchLogs(); // 重新拉取以更新 MaxProgress
+            renderDashboardGrid();
+            showLoading(false);
+            alert('✅ 已保存到云端！'); 
+            goHome(); 
+        }
+    }
+
+    async function deleteLog(id) {
+        if (!confirm("确定要删除这条云端记录吗？")) return;
+        showLoading(true);
+        const { error } = await supabaseClient.from('logs').delete().eq('id', id);
+        showLoading(false);
+        if (error) { alert('删除失败: ' + error.message); } 
+        else { 
+            await fetchLogs(); 
+            renderDashboardGrid();
+        }
+    }
+
+    async function uploadLocalData() {
+        const localLogs = JSON.parse(localStorage.getItem('training_logs') || "[]");
+        if (localLogs.length === 0) { alert("本地没有旧数据"); return; }
+        if (!confirm(`发现 ${localLogs.length} 条本地旧记录，要上传到云端吗？`)) return;
+
+        showLoading(true);
+        const payload = localLogs.map(log => ({
+            exercise: log.exerciseName, 
+            step: parseInt(log.step),
+            reps: log.reps,
+            note: log.note,
+            created_at: new Date(log.id).toISOString() 
+        }));
+        const { error } = await supabaseClient.from('logs').insert(payload);
+        showLoading(false);
+        if (error) { alert("上传失败: " + error.message); } 
+        else { 
+            alert("🎉 上传成功！"); 
+            localStorage.removeItem('training_logs'); 
+            document.getElementById('upload-btn').style.display = 'none';
+            await fetchLogs(); 
+            renderDashboardGrid();
+        }
+    }
+
+    function renderHistory(logs) {
+        const container = document.getElementById('recent-logs');
+        if (logs.length === 0) { container.innerHTML = '<p style="text-align:center;color:#999">云端暂无数据</p>'; return; }
+        container.innerHTML = logs.slice(0, 10).map(log => {
+            const dateObj = new Date(log.created_at);
+            const dateStr = dateObj.toLocaleDateString();
+            return `
+            <div class="log-item">
+                <div class="log-content">
+                    <strong>${log.exercise}</strong> <span style="font-size:12px;color:#666">(第${log.step}式)</span><br>
+                    <span style="font-size:14px">组数: ${log.reps}</span>
+                    ${log.note ? `<br><span style="font-size:12px;color:#888">📝 ${log.note}</span>` : ''}
+                </div>
+                <div class="log-actions">
+                    <span class="log-date">${dateStr}</span>
+                    <button class="delete-btn" onclick="deleteLog(${log.id})">删除</button>
+                </div>
+            </div>`;
+        }).join('');
+    }
+
+    function openStatsPage() {
+        showPage('stats-page');
+        const statsGrid = document.getElementById('stats-grid');
+        statsGrid.innerHTML = ''; 
+        let totals = {};
+        for (let key in exercises) { totals[exercises[key].name] = { reps: 0, sets: 0, color: exercises[key].color }; }
+        globalLogs.forEach(log => {
+            if (totals[log.exercise]) {
+                let parts = log.reps.split(',');
+                totals[log.exercise].sets += parts.length;
+                parts.forEach(num => totals[log.exercise].reps += (parseInt(num) || 0));
+            }
+        });
+        for (let name in totals) {
+            let data = totals[name];
+            statsGrid.innerHTML += `
+                <div class="stat-card" style="border-top-color: ${data.color}">
+                    <h3>${name}</h3>
+                    <span class="stat-number">${data.reps} <span style="font-size:12px;color:#999">次</span></span>
+                    <span class="stat-label">累计 ${data.sets} 组</span>
+                </div>
+            `;
+        }
+    }
+
+    function updateGoalDisplay() {
+        const step = document.getElementById('step-select').value;
+        const standardText = standards[currentExerciseKey][step];
+        document.getElementById('goal-text').innerText = standardText || "未知标准";
+    }
+
+    function showPage(pageId) {
+        document.getElementById('dashboard').classList.add('hide');
+        document.getElementById('workout-page').classList.add('hide');
+        document.getElementById('stats-page').classList.add('hide');
+        document.getElementById('radar-page').classList.add('hide');
+        
+        if(pageId === 'dashboard') {
+            document.getElementById('dashboard').classList.remove('hide');
+            renderDashboardGrid();
+        } else {
+            document.getElementById(pageId).classList.remove('hide');
+            document.getElementById(pageId).classList.add('show');
+        }
+    }
+
+    function goHome() { showPage('dashboard'); fetchLogs(); }
+    function showLoading(isLoading) { document.getElementById('loading').style.display = isLoading ? 'flex' : 'none'; }
+
+    init();
+</script>
+</body>
+</html>
