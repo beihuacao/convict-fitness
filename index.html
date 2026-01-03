@@ -3,116 +3,243 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>囚徒健身 (云端版)</title>
+    <title>囚徒健身 (Pro)</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    
     <style>
-        /* --- 样式保持不变 --- */
-        :root { --primary: #2c3e50; --accent: #e74c3c; --bg: #f4f6f8; --card-bg: #ffffff; --info-bg: #e8f6f3; --info-text: #1abc9c; --danger: #e74c3c; }
-        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background-color: var(--bg); margin: 0; padding: 0; color: #333; -webkit-tap-highlight-color: transparent; }
-        .container { max-width: 600px; margin: 0 auto; padding: 20px; padding-bottom: 80px; }
-        h1, h2 { text-align: center; margin-bottom: 20px; }
+        /* --- v2.0 暗黑工业风主题 --- */
+        :root {
+            --bg: #121212;          /* 深邃背景 */
+            --card-bg: #1e1e1e;     /* 卡片背景 */
+            --text-main: #e0e0e0;   /* 主要文字 */
+            --text-sub: #a0a0a0;    /* 次要文字 */
+            --border: #333333;      /* 边框线 */
+            
+            /* 动作专属色 (Neon版) */
+            --color-pushup: #ff5252;
+            --color-squat: #448aff;
+            --color-pullup: #ffd740;
+            --color-legraise: #69f0ae;
+            --color-bridge: #e040fb;
+            --color-handstand: #607d8b;
+            
+            --success: #00c853;
+            --danger: #ff5252;
+        }
+
+        body {
+            font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+            background-color: var(--bg);
+            color: var(--text-main);
+            margin: 0;
+            padding: 0;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        .container { max-width: 600px; margin: 0 auto; padding: 20px; padding-bottom: 90px; }
+        
+        h1 { font-size: 24px; letter-spacing: 1px; text-transform: uppercase; margin-bottom: 30px; font-weight: 800; }
+        h2 { border-left: 4px solid #fff; padding-left: 10px; font-size: 18px; margin-bottom: 20px; }
+        h3 { color: var(--text-sub); font-size: 14px; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 15px; }
+
+        /* --- 核心卡片样式 --- */
         .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; }
-        .card { background: var(--card-bg); padding: 20px; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); text-align: center; cursor: pointer; transition: transform 0.1s; }
-        .card:active { transform: scale(0.98); }
-        .card h3 { margin: 0 0 5px 0; font-size: 18px; }
-        .card p { margin: 0; color: #666; font-size: 14px; }
-        .stat-card { background: white; padding: 15px; border-radius: 10px; text-align: center; border-top: 4px solid #ccc; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
-        .stat-number { font-size: 24px; font-weight: bold; color: var(--primary); display: block; margin: 5px 0; }
-        .stat-label { font-size: 12px; color: #888; }
-        .detail-view { display: none; } .show { display: block; } .hide { display: none; }
+
+        .card {
+            background: var(--card-bg);
+            border-radius: 16px;
+            padding: 20px;
+            position: relative;
+            overflow: hidden;
+            transition: all 0.2s ease;
+            border: 1px solid var(--border);
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            height: 140px; 
+        }
+
+        .card:active { transform: scale(0.96); background: #2c2c2c; }
+        .card.active-glow { box-shadow: 0 0 15px rgba(255, 255, 255, 0.05); border-color: rgba(255,255,255,0.2); }
+
+        .card-icon {
+            width: 32px; height: 32px;
+            opacity: 0.8;
+            margin-bottom: 10px;
+        }
+        .card-icon svg { width: 100%; height: 100%; fill: currentColor; }
+
+        .card-title { font-size: 16px; font-weight: bold; margin: 0; }
+        .card-subtitle { font-size: 12px; color: var(--text-sub); margin-top: 5px; }
+
+        .progress-track {
+            width: 100%; height: 4px; background: #333; border-radius: 2px; margin-top: auto; position: relative;
+        }
+        .progress-fill { height: 100%; border-radius: 2px; transition: width 0.5s ease; }
+
+        button {
+            width: 100%; padding: 16px; background-color: #333; color: #fff; border: none; border-radius: 12px;
+            font-size: 16px; font-weight: bold; cursor: pointer; margin-top: 10px; transition: background 0.2s;
+        }
+        button:active { background-color: #555; }
+        button.primary { background: linear-gradient(135deg, #444, #222); border: 1px solid #555; box-shadow: 0 4px 6px rgba(0,0,0,0.3); }
+        button.save-btn { background: var(--success); color: #000; }
+        button.secondary { background: transparent; border: 1px solid #444; color: var(--text-sub); }
+        
+        input, select {
+            width: 100%; padding: 15px; background: #2c2c2c; border: 1px solid #444; color: #fff;
+            border-radius: 12px; box-sizing: border-box; font-size: 16px; outline: none;
+        }
+        input:focus { border-color: #888; }
         .form-group { margin-bottom: 20px; }
-        label { display: block; margin-bottom: 8px; font-weight: bold; }
-        .goal-box { background-color: var(--info-bg); color: var(--primary); padding: 15px; border-radius: 8px; border-left: 5px solid var(--info-text); margin-bottom: 20px; font-size: 14px; line-height: 1.5; }
-        .goal-title { font-weight: bold; color: var(--info-text); display: block; margin-bottom: 4px; }
-        input, select { width: 100%; padding: 12px; border: 1px solid #ddd; border-radius: 8px; box-sizing: border-box; font-size: 16px; background: #fff; }
-        button { width: 100%; padding: 15px; background-color: var(--primary); color: white; border: none; border-radius: 8px; font-size: 16px; font-weight: bold; cursor: pointer; margin-top: 10px; }
-        button.secondary { background-color: #95a5a6; }
-        button.outline { background-color: transparent; border: 2px solid var(--primary); color: var(--primary); }
-        button:disabled { opacity: 0.6; cursor: not-allowed; }
-        .log-item { background: white; padding: 15px; margin-bottom: 10px; border-radius: 8px; border-left: 5px solid var(--accent); display: flex; justify-content: space-between; align-items: center; }
-        .log-content { flex: 1; padding-right: 10px; }
-        .log-actions { text-align: right; min-width: 70px; }
-        .log-date { color: #888; font-size: 12px; display: block; margin-bottom: 5px; }
-        .delete-btn { background-color: white; color: var(--danger); border: 1px solid var(--danger); padding: 5px 10px; font-size: 12px; border-radius: 4px; width: auto; cursor: pointer; }
-        /* 加载动画 */
-        .loading-overlay { position: fixed; top:0; left:0; right:0; bottom:0; background: rgba(255,255,255,0.8); display: flex; justify-content: center; align-items: center; z-index: 999; display: none; }
-        .spinner { width: 40px; height: 40px; border: 4px solid #f3f3f3; border-top: 4px solid var(--primary); border-radius: 50%; animation: spin 1s linear infinite; }
+        label { display: block; margin-bottom: 8px; font-weight: bold; color: var(--text-sub); font-size: 12px; text-transform: uppercase; }
+
+        #toast {
+            visibility: hidden; min-width: 250px; background-color: #333; color: #fff; text-align: center;
+            border-radius: 50px; padding: 16px; position: fixed; z-index: 1000; left: 50%; top: 30px;
+            transform: translateX(-50%); box-shadow: 0 5px 15px rgba(0,0,0,0.5); font-size: 14px; opacity: 0;
+            transition: opacity 0.3s, top 0.3s; border: 1px solid #555; display: flex; align-items: center; justify-content: center; gap: 10px;
+        }
+        #toast.show { visibility: visible; opacity: 1; top: 50px; }
+
+        .goal-box {
+            background: rgba(255,255,255,0.05); border-left: 4px solid var(--text-sub); padding: 15px;
+            border-radius: 8px; margin-bottom: 20px; font-size: 14px; color: var(--text-main);
+        }
+        .log-item {
+            background: var(--card-bg); padding: 15px; margin-bottom: 10px; border-radius: 12px;
+            display: flex; justify-content: space-between; align-items: center; border: 1px solid #333;
+        }
+        .log-date { color: var(--text-sub); font-size: 12px; }
+        .delete-btn { background: transparent; color: var(--danger); border: 1px solid var(--danger); padding: 6px 12px; font-size: 12px; width: auto; margin: 0;}
+
+        .loading-overlay { position: fixed; top:0; left:0; right:0; bottom:0; background: rgba(0,0,0,0.8); display: flex; justify-content: center; align-items: center; z-index: 999; display: none; }
+        .spinner { width: 40px; height: 40px; border: 4px solid #333; border-top: 4px solid #fff; border-radius: 50%; animation: spin 1s linear infinite; }
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+
+        .detail-view { display: none; animation: fadeIn 0.3s; }
+        .show { display: block; }
+        .hide { display: none; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+
+        .chart-container { position: relative; height: 300px; width: 100%; margin-top: 20px; }
+        .chart-legend { display: flex; justify-content: center; gap: 20px; margin-top: 15px; font-size: 12px; color: var(--text-sub); }
+        .dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; margin-right: 5px; }
+
     </style>
 </head>
 <body>
 
 <div id="loading" class="loading-overlay"><div class="spinner"></div></div>
+<div id="toast">✅ 保存成功</div>
 
 <div class="container">
     
     <div id="dashboard">
-        <h1>☁️ 囚徒健身 (云端版)</h1>
+        <h1>CONVICT CONDITIONING <span style="font-size:12px; color:#666; vertical-align: middle">PRO</span></h1>
+        
         <div class="grid" id="menu-grid"></div>
 
-        <div style="margin-top:20px; display: flex; gap: 10px;">
-            <button class="outline" onclick="openStatsPage()">📊 查看生涯统计</button>
-            <button class="secondary" style="background:#f39c12" onclick="uploadLocalData()" id="upload-btn">⬆️ 同步旧数据</button>
+        <div style="margin-top:30px; display: flex; gap: 15px;">
+            <button class="primary" style="flex:1" onclick="openStatsPage()">📊 生涯统计</button>
+            <button class="primary" style="flex:1; border-color: var(--color-bridge)" onclick="openRadarPage()">🌟 能力雷达</button>
         </div>
+        
+        <button class="secondary" style="margin-top:15px; border-style:dashed; display:none" onclick="uploadLocalData()" id="upload-btn">⬆️ 同步本地旧数据</button>
 
-        <div style="margin-top:30px;">
-            <h3>最近云端记录</h3>
-            <div id="recent-logs">加载中...</div>
+        <div style="margin-top:40px;">
+            <h3>Latest Logs</h3>
+            <div id="recent-logs">Syncing...</div>
         </div>
     </div>
 
     <div id="workout-page" class="detail-view">
-        <h2 id="page-title">动作名称</h2>
+        <h2 id="page-title">WORKOUT</h2>
         <div class="form-group">
-            <label>当前进度 (第几式):</label>
-            <select id="step-select" onchange="updateGoalDisplay()">
-                <option value="1">1. 疗伤级</option><option value="2">2. 初级</option><option value="3">3. 中级</option><option value="4">4. 进阶级</option><option value="5">5. 基准级</option><option value="6">6. 强化级</option><option value="7">7. 偏重级</option><option value="8">8. 半单侧级</option><option value="9">9. 辅助单侧级</option><option value="10">10. 终极大师级</option>
-            </select>
+            <label>LEVEL SELECT</label>
+            <select id="step-select" onchange="updateGoalDisplay()"></select>
         </div>
         <div id="goal-box" class="goal-box">
-            <span class="goal-title">🏆 升级标准</span>
-            <span id="goal-text">加载中...</span>
+            <span style="color:var(--text-sub); font-size:12px; font-weight:bold; display:block; margin-bottom:5px;">TARGET</span>
+            <span id="goal-text">Loading...</span>
         </div>
         <div class="form-group">
-            <label>今日训练 (组数 x 次数):</label>
-            <input type="text" id="reps-input" placeholder="例如: 20 20 15">
+            <label>REPS (e.g., 20 20 15)</label>
+            <input type="tel" id="reps-input" placeholder="Enter reps...">
         </div>
         <div class="form-group">
-            <label>备注 (感受):</label>
-            <input type="text" id="note-input" placeholder="动作是否标准？关节痛？">
+            <label>NOTES</label>
+            <input type="text" id="note-input" placeholder="Form check, pain, etc.">
         </div>
-        <button onclick="saveLog()">💾 保存到云端</button>
-        <button class="secondary" onclick="goHome()">🔙 返回首页</button>
+        <button class="save-btn" onclick="saveLog()">COMPLETE WORKOUT</button>
+        <button class="secondary" onclick="goHome()">CANCEL</button>
     </div>
 
     <div id="stats-page" class="detail-view">
-        <h2>📊 云端生涯统计</h2>
+        <h2>CAREER STATS</h2>
         <div class="grid" id="stats-grid"></div>
-        <button class="secondary" onclick="goHome()">🔙 返回首页</button>
+        <button class="secondary" onclick="goHome()">BACK</button>
+    </div>
+
+    <div id="radar-page" class="detail-view">
+        <h2>SKILL RADAR</h2>
+        <div class="chart-container">
+            <canvas id="skillChart"></canvas>
+        </div>
+        <div class="chart-legend">
+            <div><span class="dot" style="background:rgba(255,255,255,0.8)"></span>Active</div>
+            <div><span class="dot" style="background:#555"></span>Inactive (>14 days)</div>
+        </div>
+        <button class="secondary" style="margin-top:30px" onclick="goHome()">BACK</button>
     </div>
 
 </div>
 
 <script>
     // ----------------------------------------------------
-    // ⚠️⚠️ 这里填入你的 Supabase 信息 ⚠️⚠️
-    // ----------------------------------------------------
-    // 注意：我已经把它们放在了这里，但为了安全（见下文提醒），建议你后续去后台重新生成一个KEY
     const SUPABASE_URL = 'https://pcqnommlfizdqeyodsfw.supabase.co'; 
     const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBjcW5vbW1sZml6ZHFleW9kc2Z3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjczNjUyMTIsImV4cCI6MjA4Mjk0MTIxMn0.i_xy37yDL8-D7mnDkQmJfzjK2EQgXQCLLvDN8BImotg'; 
     // ----------------------------------------------------
 
-    // 🔥 修复点 1：将变量名从 supabase 改为 supabaseClient，避免和库名冲突
     const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
-    // 基础配置
+    // 🎨 修复点：name 必须改回中文 "俯卧撑" 以匹配数据库旧数据
+    // 🎨 新增 uiName：用于界面显示英文 "PUSHUP"
     const exercises = {
-        pushup: { name: "俯卧撑", color: "#e74c3c" },
-        squat: { name: "深蹲", color: "#3498db" },
-        pullup: { name: "引体向上", color: "#f1c40f" },
-        legraise: { name: "举腿", color: "#2ecc71" },
-        bridge: { name: "桥", color: "#9b59b6" },
-        handstand: { name: "倒立撑", color: "#34495e" }
+        pushup: { 
+            name: "俯卧撑", uiName: "PUSHUP", color: "var(--color-pushup)", 
+            icon: '<path d="M20.5 11H3.5C2.67 11 2 11.67 2 12.5V14H22V12.5C22 11.67 21.33 11 20.5 11M3 6H21V4H3V6M17.5 15H6.5C5.67 15 5 15.67 5 16.5V19H19V16.5C19 15.67 18.33 15 17.5 15Z" />' 
+        },
+        squat: { 
+            name: "深蹲", uiName: "SQUAT", color: "var(--color-squat)",
+            icon: '<path d="M16,13C15.71,13 15.38,13 15.03,13.05C16.19,13.89 17,15 17,16.5V21H7V16.5C7,14.89 7.9,13.66 9.27,13.03C8.75,13 8.29,13 8,13C4.14,13 1,16.14 1,20V22H23V20C23,16.14 19.86,13 16,13M12,2C14.21,2 16,3.79 16,6C16,8.21 14.21,10 12,10C9.79,10 8,8.21 8,6C8,3.79 9.79,2 12,2Z" />'
+        },
+        pullup: { 
+            name: "引体向上", uiName: "PULLUP", color: "var(--color-pullup)",
+            icon: '<path d="M5,3H19C20.1,3 21,3.9 21,5V7H19V5H5V7H3V5C3,3.9 3.9,3 5,3M12,8C10.9,8 10,8.9 10,10S10.9,12 12,12S14,11.1 14,10S13.1,8 12,8M12,14C10,14 6,15 6,17V21H18V17C18,15 14,14 12,14Z" />'
+        },
+        legraise: { 
+            name: "举腿", uiName: "LEG RAISE", color: "var(--color-legraise)",
+            icon: '<path d="M22 2H2V4H22V2M19 13L16 22H14L17 13H13L10 22H8L12 10H6L4 16H2L5 7H16L19 13Z" />'
+        },
+        bridge: { 
+            name: "桥", uiName: "BRIDGE", color: "var(--color-bridge)",
+            icon: '<path d="M2,16H5L7,11H17L19,16H22V18H18L17,14H7L6,18H2V16M12,8A3,3 0 0,0 9,11A3,3 0 0,0 12,14A3,3 0 0,0 15,11A3,3 0 0,0 12,8Z" />'
+        },
+        handstand: { 
+            name: "倒立撑", uiName: "HANDSTAND", color: "var(--color-handstand)",
+            icon: '<path d="M21,12H19V17H17L12,5L7,17H5V12H3V22H5V19H7V22H17V19H19V22H21V12M12,4A2,2 0 0,0 10,2A2,2 0 0,0 12,0A2,2 0 0,0 14,2A2,2 0 0,0 12,4Z" />'
+        }
+    };
+
+    const stepNames = {
+        pushup: ["墙壁俯卧撑", "上斜俯卧撑", "膝盖俯卧撑", "半程俯卧撑", "标准俯卧撑", "窄距俯卧撑", "偏重俯卧撑", "单臂半程俯卧撑", "杠杆俯卧撑", "单臂俯卧撑"],
+        squat: ["肩倒立深蹲", "折刀深蹲", "支撑深蹲", "半程深蹲", "标准深蹲", "窄距深蹲", "偏重深蹲", "单腿半程深蹲", "辅助单腿深蹲", "单腿深蹲"],
+        pullup: ["垂直引体", "水平引体", "折刀引体", "半程引体向上", "标准引体向上", "窄距引体向上", "偏重引体向上", "单臂半程引体", "辅助单臂引体", "单臂引体向上"],
+        legraise: ["坐姿屈膝", "平卧抬膝", "平卧屈举腿", "平卧蛙举腿", "平卧直举腿", "悬垂抬膝", "悬垂屈举腿", "悬垂蛙举腿", "悬垂半程直举腿", "悬垂直举腿"],
+        bridge: ["短桥", "直桥", "高低桥", "顶桥", "半桥", "标准桥", "下行桥", "上行桥", "合桥", "铁板桥 (站立下腰)"],
+        handstand: ["靠墙顶立", "乌鸦式", "靠墙倒立", "半程倒立撑", "标准倒立撑", "窄距倒立撑", "偏重倒立撑", "单臂半程倒立撑", "杠杆倒立撑", "单臂倒立撑"]
     };
 
     const standards = {
@@ -126,169 +253,245 @@
 
     let currentExerciseKey = '';
     let globalLogs = []; 
+    let maxProgress = { pushup: 1, squat: 1, pullup: 1, legraise: 1, bridge: 1, handstand: 1 };
+    let myRadarChart = null;
 
-    // 页面加载时执行
     async function init() {
-        renderDashboardGrid();
-        
         const localLogs = JSON.parse(localStorage.getItem('training_logs') || "[]");
-        if (localLogs.length === 0) {
-            document.getElementById('upload-btn').style.display = 'none';
+        if (localLogs.length > 0) {
+            document.getElementById('upload-btn').style.display = 'block';
         }
-
         await fetchLogs(); 
     }
 
+    // 🎨 渲染首页：使用 uiName (英文) 显示，但数据匹配用 name (中文)
     function renderDashboardGrid() {
         const grid = document.getElementById('menu-grid');
         grid.innerHTML = '';
+        
         for (let key in exercises) {
             let item = exercises[key];
-            let savedStep = localStorage.getItem(`step_${key}`) || 1;
+            let maxStep = maxProgress[key]; 
+            let currentName = stepNames[key][maxStep - 1];
+            
+            let progressPercent = (maxStep / 10) * 100;
+
+            const lastLog = globalLogs.find(log => log.exercise === item.name); // 修复：用中文名去匹配
+            let isActive = false;
+            if (lastLog) {
+                const diffDays = Math.ceil(Math.abs(new Date() - new Date(lastLog.created_at)) / (86400000));
+                if (diffDays <= 14) isActive = true;
+            }
+
+            let glowClass = isActive ? 'active-glow' : '';
+            let borderColor = isActive ? item.color : 'transparent';
+            
             grid.innerHTML += `
-                <div class="card" onclick="openExercise('${key}')">
-                    <h3>${item.name}</h3>
-                    <p>当前: 第 ${savedStep} 式</p>
+                <div class="card ${glowClass}" style="border-color:${borderColor}" onclick="openExercise('${key}')">
+                    <div style="display:flex; justify-content:space-between; align-items:start">
+                        <div class="card-icon" style="color:${item.color}">
+                            <svg viewBox="0 0 24 24">${item.icon}</svg>
+                        </div>
+                        <span style="font-size:24px; font-weight:bold; color:#fff">${maxStep}</span>
+                    </div>
+                    <div>
+                        <h3 class="card-title" style="color:${item.color}">${item.uiName}</h3> <p class="card-subtitle">${currentName}</p>
+                    </div>
+                    <div class="progress-track">
+                        <div class="progress-fill" style="width:${progressPercent}%; background:${item.color}"></div>
+                    </div>
                 </div>
             `;
         }
     }
 
-    // 🔥 修复点 2：改为使用 supabaseClient 来调用
     async function fetchLogs() {
-        document.getElementById('recent-logs').innerHTML = '正在同步云端数据...';
+        document.getElementById('recent-logs').innerHTML = '<span style="color:#666">Connecting to cloud...</span>';
+        const { data, error } = await supabaseClient.from('logs').select('*').order('created_at', { ascending: false });
+        if (error) { console.error(error); document.getElementById('recent-logs').innerHTML = '<span style="color:var(--danger)">Sync Failed</span>'; return; }
         
-        // 注意这里：用了 supabaseClient
-        const { data, error } = await supabaseClient
-            .from('logs')
-            .select('*')
-            .order('created_at', { ascending: false });
-
-        if (error) {
-            console.error(error);
-            document.getElementById('recent-logs').innerHTML = '<span style="color:red">数据加载失败，请检查配置</span>';
-            return;
-        }
-
         globalLogs = data; 
+        
+        // 计算最高等级（修复：用中文名匹配）
+        maxProgress = { pushup: 1, squat: 1, pullup: 1, legraise: 1, bridge: 1, handstand: 1 };
+        globalLogs.forEach(log => {
+            // 关键修复：这里的 k.name 必须是中文 "俯卧撑"，才能匹配到 log.exercise
+            let key = Object.keys(exercises).find(k => exercises[k].name === log.exercise);
+            if (key && log.step > maxProgress[key]) {
+                maxProgress[key] = log.step;
+            }
+        });
+
         renderHistory(globalLogs);
+        renderDashboardGrid(); 
     }
 
     function openExercise(key) {
         currentExerciseKey = key;
         showPage('workout-page');
-        document.getElementById('page-title').innerText = exercises[key].name;
+        document.getElementById('page-title').innerText = exercises[key].uiName; // 界面显示英文
+        document.getElementById('page-title').style.color = exercises[key].color;
+        
+        const selectEl = document.getElementById('step-select');
+        selectEl.innerHTML = ''; 
+        stepNames[key].forEach((name, index) => {
+            let stepNum = index + 1;
+            let option = document.createElement('option');
+            option.value = stepNum;
+            option.text = `${stepNum}. ${name}`;
+            selectEl.appendChild(option);
+        });
         
         let savedStep = localStorage.getItem(`step_${key}`) || 1;
-        document.getElementById('step-select').value = savedStep;
+        selectEl.value = savedStep;
         updateGoalDisplay();
-
         document.getElementById('reps-input').value = '';
         document.getElementById('note-input').value = '';
     }
 
-    // 🔥 修复点 3：改为使用 supabaseClient
+    function openRadarPage() {
+        showPage('radar-page');
+        const dataValues = [];
+        const labels = [];
+        const pointColors = []; 
+        const order = ['pushup', 'squat', 'pullup', 'legraise', 'bridge', 'handstand'];
+
+        order.forEach(key => {
+            dataValues.push(maxProgress[key]);
+            labels.push(exercises[key].uiName); // 雷达图标签用英文
+
+            // 活跃判断（修复：用中文名匹配）
+            const lastLog = globalLogs.find(log => log.exercise === exercises[key].name);
+            let isDecayed = true; 
+            if (lastLog) {
+                const diffDays = Math.ceil(Math.abs(new Date() - new Date(lastLog.created_at)) / (86400000));
+                if (diffDays <= 14) isDecayed = false;
+            }
+            pointColors.push(isDecayed ? '#555' : '#fff');
+        });
+
+        if (myRadarChart) { myRadarChart.destroy(); }
+
+        const ctx = document.getElementById('skillChart').getContext('2d');
+        Chart.defaults.color = '#888';
+        Chart.defaults.scale.grid.color = '#333';
+        
+        myRadarChart = new Chart(ctx, {
+            type: 'radar',
+            data: {
+                labels: labels,
+                datasets: [{
+                    label: 'Capability',
+                    data: dataValues,
+                    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+                    borderColor: '#fff',
+                    borderWidth: 2,
+                    pointBackgroundColor: pointColors, 
+                    pointBorderColor: pointColors,
+                    pointRadius: 6
+                }]
+            },
+            options: {
+                scales: {
+                    r: {
+                        angleLines: { color: '#333' },
+                        grid: { color: '#333' },
+                        suggestedMin: 0,
+                        suggestedMax: 10,
+                        ticks: { display: false, stepSize: 2 },
+                        pointLabels: { font: { size: 12, weight: 'bold' }, color: '#fff' }
+                    }
+                },
+                plugins: { legend: { display: false } }
+            }
+        });
+    }
+
+    function showToast(message) {
+        const toast = document.getElementById('toast');
+        toast.innerText = message;
+        toast.className = 'show';
+        if (navigator.vibrate) navigator.vibrate(50);
+        setTimeout(function(){ toast.className = toast.className.replace("show", ""); }, 3000);
+    }
+
     async function saveLog() {
         const step = document.getElementById('step-select').value;
         let rawReps = document.getElementById('reps-input').value;
         const note = document.getElementById('note-input').value;
 
-        if (!rawReps) { alert("请填写做了多少个！"); return; }
+        if (!rawReps) { alert("Please enter reps"); return; }
         const reps = rawReps.replace(/，|\s+/g, ','); 
 
         localStorage.setItem(`step_${currentExerciseKey}`, step);
-
         showLoading(true);
 
-        // 注意这里：用了 supabaseClient
-        const { error } = await supabaseClient
-            .from('logs')
-            .insert({
+        // 修复：保存时依然用中文名，确保数据库纯净
+        const { error } = await supabaseClient.from('logs').insert({
                 exercise: exercises[currentExerciseKey].name,
                 step: parseInt(step),
                 reps: reps,
                 note: note
             });
-
-        showLoading(false);
-
-        if (error) {
-            alert('❌ 保存失败: ' + error.message);
-        } else {
-            alert('✅ 已保存到云端！');
-            goHome();
+        
+        if (error) { 
+            showLoading(false);
+            alert('Error: ' + error.message); 
+        } else { 
+            await fetchLogs(); 
+            showLoading(false);
+            showToast("✅ WORKOUT SAVED"); 
+            goHome(); 
         }
     }
 
-    // 🔥 修复点 4：改为使用 supabaseClient
     async function deleteLog(id) {
-        if (!confirm("确定要删除这条云端记录吗？")) return;
-        
+        if (!confirm("Delete this log?")) return;
         showLoading(true);
-        const { error } = await supabaseClient
-            .from('logs')
-            .delete()
-            .eq('id', id);
-        
+        const { error } = await supabaseClient.from('logs').delete().eq('id', id);
         showLoading(false);
-
-        if (error) {
-            alert('删除失败: ' + error.message);
-        } else {
-            fetchLogs(); 
-        }
+        if (error) { alert('Error: ' + error.message); } 
+        else { await fetchLogs(); showToast("🗑️ LOG DELETED"); }
     }
 
-    // 🔥 修复点 5：改为使用 supabaseClient
     async function uploadLocalData() {
         const localLogs = JSON.parse(localStorage.getItem('training_logs') || "[]");
-        if (localLogs.length === 0) { alert("本地没有旧数据"); return; }
-        if (!confirm(`发现 ${localLogs.length} 条本地旧记录，要上传到云端吗？`)) return;
-
+        if (!confirm(`Upload ${localLogs.length} old logs?`)) return;
         showLoading(true);
-        
         const payload = localLogs.map(log => ({
-            exercise: log.exerciseName, 
-            step: parseInt(log.step),
-            reps: log.reps,
-            note: log.note,
-            created_at: new Date(log.id).toISOString() 
+            exercise: log.exerciseName, step: parseInt(log.step), reps: log.reps, note: log.note, created_at: new Date(log.id).toISOString() 
         }));
-
         const { error } = await supabaseClient.from('logs').insert(payload);
         showLoading(false);
-
-        if (error) {
-            alert("上传失败: " + error.message);
-        } else {
-            alert("🎉 全部上传成功！本地旧数据已清空。");
+        if (error) { alert("Error: " + error.message); } 
+        else { 
+            showToast("🎉 UPLOAD SUCCESS");
             localStorage.removeItem('training_logs'); 
             document.getElementById('upload-btn').style.display = 'none';
-            fetchLogs(); 
+            await fetchLogs(); 
         }
     }
 
     function renderHistory(logs) {
         const container = document.getElementById('recent-logs');
-        if (logs.length === 0) {
-            container.innerHTML = '<p style="text-align:center;color:#999">云端暂无数据</p>';
-            return;
-        }
-
+        if (logs.length === 0) { container.innerHTML = '<p style="text-align:center;color:#444">NO DATA</p>'; return; }
         container.innerHTML = logs.slice(0, 10).map(log => {
             const dateObj = new Date(log.created_at);
-            const dateStr = dateObj.toLocaleDateString();
-            
+            // 界面美化：尝试把中文名转成英文名显示，找不到就显示原名
+            let displayTitle = log.exercise;
+            let conf = Object.values(exercises).find(e => e.name === log.exercise);
+            if (conf) displayTitle = conf.uiName;
+
             return `
             <div class="log-item">
                 <div class="log-content">
-                    <strong>${log.exercise}</strong> <span style="font-size:12px;color:#666">(第${log.step}式)</span><br>
-                    <span style="font-size:14px">组数: ${log.reps}</span>
-                    ${log.note ? `<br><span style="font-size:12px;color:#888">📝 ${log.note}</span>` : ''}
+                    <strong style="color:#fff">${displayTitle}</strong> <span style="font-size:12px;color:#888">(#${log.step})</span><br>
+                    <span style="font-size:14px; color:#aaa">Sets: ${log.reps}</span>
+                    ${log.note ? `<br><span style="font-size:12px;color:#666">📝 ${log.note}</span>` : ''}
                 </div>
                 <div class="log-actions">
-                    <span class="log-date">${dateStr}</span>
-                    <button class="delete-btn" onclick="deleteLog(${log.id})">删除</button>
+                    <span class="log-date">${dateObj.toLocaleDateString()}</span>
+                    <button class="delete-btn" onclick="deleteLog(${log.id})">DEL</button>
                 </div>
             </div>`;
         }).join('');
@@ -298,27 +501,23 @@
         showPage('stats-page');
         const statsGrid = document.getElementById('stats-grid');
         statsGrid.innerHTML = ''; 
-
         let totals = {};
-        for (let key in exercises) {
-            totals[exercises[key].name] = { reps: 0, sets: 0, color: exercises[key].color };
-        }
-
+        for (let key in exercises) { totals[exercises[key].name] = { reps: 0, sets: 0, color: exercises[key].color, uiName: exercises[key].uiName }; }
+        
         globalLogs.forEach(log => {
+            // 修复：用中文名 log.exercise 去 totals 字典里查
             if (totals[log.exercise]) {
                 let parts = log.reps.split(',');
                 totals[log.exercise].sets += parts.length;
                 parts.forEach(num => totals[log.exercise].reps += (parseInt(num) || 0));
             }
         });
-
         for (let name in totals) {
             let data = totals[name];
             statsGrid.innerHTML += `
-                <div class="stat-card" style="border-top-color: ${data.color}">
-                    <h3>${name}</h3>
-                    <span class="stat-number">${data.reps} <span style="font-size:12px;color:#999">次</span></span>
-                    <span class="stat-label">累计 ${data.sets} 组</span>
+                <div class="card" style="height:auto; border-top:4px solid ${data.color}">
+                    <h3 style="margin:0; color:#fff">${data.uiName}</h3> <span style="font-size:28px; font-weight:bold; color:${data.color}; display:block; margin:10px 0">${data.reps}</span>
+                    <span style="font-size:12px; color:#666">TOTAL REPS (${data.sets} SETS)</span>
                 </div>
             `;
         }
@@ -327,32 +526,28 @@
     function updateGoalDisplay() {
         const step = document.getElementById('step-select').value;
         const standardText = standards[currentExerciseKey][step];
-        document.getElementById('goal-text').innerText = standardText || "未知标准";
+        document.getElementById('goal-text').innerText = standardText || "N/A";
+        document.getElementById('goal-box').style.borderLeftColor = exercises[currentExerciseKey].color;
     }
 
     function showPage(pageId) {
-        document.getElementById('dashboard').classList.add('hide');
-        document.getElementById('workout-page').classList.add('hide');
-        document.getElementById('stats-page').classList.add('hide');
-        
-        if(pageId === 'dashboard') document.getElementById('dashboard').classList.remove('hide');
-        else {
+        ['dashboard','workout-page','stats-page','radar-page'].forEach(id => {
+            document.getElementById(id).classList.remove('show');
+            document.getElementById(id).classList.add('hide');
+        });
+        if(pageId === 'dashboard') {
+            document.getElementById('dashboard').classList.remove('hide');
+            renderDashboardGrid();
+        } else {
             document.getElementById(pageId).classList.remove('hide');
             document.getElementById(pageId).classList.add('show');
         }
     }
 
-    function goHome() {
-        showPage('dashboard');
-        fetchLogs(); 
-    }
-
-    function showLoading(isLoading) {
-        document.getElementById('loading').style.display = isLoading ? 'flex' : 'none';
-    }
+    function goHome() { showPage('dashboard'); fetchLogs(); }
+    function showLoading(isLoading) { document.getElementById('loading').style.display = isLoading ? 'flex' : 'none'; }
 
     init();
-
 </script>
 </body>
 </html>
